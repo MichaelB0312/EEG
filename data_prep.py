@@ -43,6 +43,7 @@ while i < marker_data.shape[0]:
 
 ############ train, val, test split ###############
 import random
+from sklearn.model_selection import train_test_split
 
 keys = list(data.keys())
 random.shuffle(keys)
@@ -73,6 +74,43 @@ with open('./data/prep_data.json', 'w') as json_file:
     json.dump(data, json_file, indent=4)
 
 print("Data saved to prep_data.json")
+
+############ split train,data,test #########
+def del_pattern(data):
+    new_dict = data
+    for dict_idx, value in data.items():
+        if value['label'] != 'pattern':
+            new_dict[dict_idx] = value
+
+    return new_dict
+
+ignore_pattern = True
+if ignore_pattern:
+    del_pattern(data)
+
+# Convert dictionary to list of items
+data_list = [(key, value) for key, value in data.items()]
+
+# Split the data into train, validation, and test sets
+train_val, test = train_test_split(data_list, test_size=0.1, random_state=42)
+train, val = train_test_split(train_val, test_size=0.1 , random_state=42)  # 0.1 x 0.9 = 0.09
+
+# Convert back to dictionary while maintaining structure
+train_dict = {i: {'eeg_dat': value['eeg_dat'], 'label': value['label']} for i, (key,value) in enumerate(train)}
+val_dict = {i: {'eeg_dat': value['eeg_dat'], 'label': value['label']} for i, (key,value) in enumerate(val)}
+test_dict = {i: {'eeg_dat': value['eeg_dat'], 'label': value['label']} for i, (key,value) in enumerate(test)}
+
+# Save to JSON files
+with open('./data/train.json', 'w') as f:
+    json.dump(train_dict, f, indent=4)
+
+with open('./data/val.json', 'w') as f:
+    json.dump(val_dict, f, indent=4)
+
+with open('./data/test.json', 'w') as f:
+    json.dump(test_dict, f, indent=4)
+
+print("Data has been split and saved to train.json, val.json, and test.json.")
 
 
 
