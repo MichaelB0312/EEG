@@ -15,7 +15,7 @@ import random
 #               'mean': args.dataset_mean, 'std': args.dataset_std,
 #               'noise': False}
 class EEGDataset(Dataset):
-    def __init__(self, dataset_json_file, ignore_pattern=True, label_num=2, samp_rate=128, window_length=25, hop_len=10, freq_bins=128,
+    def __init__(self, dataset_json_file, label_num=2, samp_rate=128, window_length=25, hop_len=10, freq_bins=128,
                  MaxDuration=80, freqm=48, timem=52, audio_conf=None):
         """
         Dataset that manages audio recordings
