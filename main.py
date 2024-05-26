@@ -1,11 +1,12 @@
 import argparse
 import os
 import dataloader
-import models
+from models_dir import models
 from traintest import train, validate
 import numpy as np
 import time
 import torch
+from torch import nn
 import ast
 import pickle
 
@@ -19,10 +20,10 @@ parser.add_argument("--exp-dir", type=str, default="", help="directory to dump e
 parser.add_argument('-b', '--batch-size', default=16, type=int, metavar='N', help='mini-batch size (default: 100)')
 parser.add_argument("--optim", type=str, default="adam", help="training optimizer", choices=["sgd", "adam"])
 parser.add_argument('--lr', '--learning-rate', default=0.0005, type=float, metavar='LR', help='initial learning rate')
-parser.add_argument("--n-epochs", type=int, default=40, help="number of maximum training epochs")
+parser.add_argument("--n-epochs", type=int, default=2, help="number of maximum training epochs")
 parser.add_argument("--n-print-steps", type=int, default=1000, help="number of steps to print statistics")
 # model args
-parser.add_argument("--model", type=str, default="efficientnet", help="audio model architecture", choices=["efficientnet", "svm"])
+parser.add_argument("--model", type=str, default="efficientnet", help="eeg model architecture", choices=["efficientnet", "svm"])
 parser.add_argument("--eff_b", type=int, default=0, help="which efficientnet to use, the larger number, the more complex")
 parser.add_argument("--n_class", type=int, default=2, help="number of classes")
 parser.add_argument('--impretrain', help='if use imagenet pretrained CNNs', type=ast.literal_eval, default='True')
@@ -64,6 +65,7 @@ if args.model == 'efficientnet':
 elif args.model == 'svm':
     eeg_model = models.EEG_SVM_Classifier(kernel=args.kernel, C=args.c, gamma='scale')
 
+
 ## save experiment in a directory
 if not bool(args.exp_dir):
     print("exp_dir not specified, automatically naming one...")
@@ -81,30 +83,38 @@ with open("%s/args.pkl" % args.exp_dir, "wb") as f:
 if args.model == 'efficientnet':
     train(eeg_model, train_loader, val_loader, args)
 elif args.model == 'svm':
-    svm_train() #TODO
+    eeg_model.fit(args.data_train)
+    val_accuracy = eeg_model.evaluate(args.data_val)
+    test_accuracy = eeg_model.evaluate(args.data_eval)
 
 print('---------------Result Summary---------------')
-if args.data_eval != None:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if args.model == 'efficientnet':
+    if args.data_eval != None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # evaluate best single model
-    sd = torch.load(args.exp_dir + '/models/best_eeg_model.pth', map_location=device)
-    if not isinstance(eeg_model, nn.DataParallel):
-        audio_model = nn.DataParallel(eeg_model)
-    eeg_model.load_state_dict(sd)
-    print('---------------evaluate best single model on the validation set---------------')
-    stats, _ = validate(eeg_model, val_loader, args, 'best_single_valid_set')
-    val_mAP = np.mean([stat['AP'] for stat in stats])
-    val_mAUC = np.mean([stat['auc'] for stat in stats])
-    print("mAP: {:.6f}".format(val_mAP))
-    print("AUC: {:.6f}".format(val_mAUC))
-    print('---------------evaluate best single model on the evaluation/test set---------------')
-    stats, _ = validate(eeg_model, eval_loader, args, 'best_single_eval_set', eval_target=True)
-    eval_mAP = np.mean([stat['AP'] for stat in stats])
-    eval_mAUC = np.mean([stat['auc'] for stat in stats])
-    print("mAP: {:.6f}".format(eval_mAP))
-    print("AUC: {:.6f}".format(eval_mAUC))
-    np.savetxt(args.exp_dir + '/best_single_result.csv', [val_mAP, val_mAUC, eval_mAP, eval_mAUC])
+        # evaluate best single model
+        sd = torch.load(args.exp_dir + '/models/best_eeg_model.pth', map_location=device)
+        if not isinstance(eeg_model, nn.DataParallel):
+            eeg_model = nn.DataParallel(eeg_model)
+        eeg_model.load_state_dict(sd)
+        print('---------------evaluate best single model on the validation set---------------')
+        stats, _ = validate(eeg_model, val_loader, args, 'best_single_valid_set')
+        val_mAP = np.mean([stat['AP'] for stat in stats])
+        val_mAUC = np.mean([stat['auc'] for stat in stats])
+        print("mAP: {:.6f}".format(val_mAP))
+        print("AUC: {:.6f}".format(val_mAUC))
+        print('---------------evaluate best single model on the evaluation/test set---------------')
+        stats, _ = validate(eeg_model, eval_loader, args, 'best_single_eval_set', eval_target=True)
+        eval_mAP = np.mean([stat['AP'] for stat in stats])
+        eval_mAUC = np.mean([stat['auc'] for stat in stats])
+        print("mAP: {:.6f}".format(eval_mAP))
+        print("AUC: {:.6f}".format(eval_mAUC))
+        np.savetxt(args.exp_dir + '/best_single_result.csv', [val_mAP, val_mAUC, eval_mAP, eval_mAUC])
+
+elif args.model == 'svm':
+    print(f"Validation Accuracy: {val_accuracy}")
+    print(f"Test Accuracy: {test_accuracy}")
+    np.savetxt(args.exp_dir + '/SVM_result.csv', [val_accuracy, test_accuracy])
 
 
 

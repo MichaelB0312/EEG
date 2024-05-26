@@ -1,7 +1,7 @@
 import sys
 import os
 import datetime
-from utilities import *
+from utilities import util
 #  allows you to import modules from parent directory
 sys.path.append(os.path.dirname(os.path.dirname(sys.path[0])))
 import time
@@ -15,7 +15,7 @@ while maintaining 32-bit (float32) precision for some critical parts of the mode
 '''
 from torch.cuda.amp import autocast,GradScaler
 
-
+AverageMeter = util.AverageMeter
 def train(eeg_model, train_loader, test_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('running on ' + str(device))
@@ -67,12 +67,12 @@ def train(eeg_model, train_loader, test_loader, args):
 
     print("current #steps=%s, #epochs=%s" % (global_step, epoch))
     print("start training...")
-    result = np.zeros([args.n_epochs, 10]) # saving mAP, AUC, recall..etc 10 stats
-    audio_model.train()
+    result = np.zeros([args.n_epochs, 7]) # saving mAP, AUC, recall..etc 10 stats
+    eeg_model.train()
     while epoch < args.n_epochs + 1:
         begin_time = time.time()
         end_time = time.time()
-        audio_model.train()
+        eeg_model.train()
         print('---------------')
         print(datetime.datetime.now())
         print("current #epochs=%s, #steps=%s" % (epoch, global_step))
@@ -84,7 +84,7 @@ def train(eeg_model, train_loader, test_loader, args):
             labels = labels.to(device, non_blocking=True)
 
             data_time.update(time.time() - end_time)
-            per_sample_data_time.update((time.time() - end_time) / audio_input.shape[0])
+            per_sample_data_time.update((time.time() - end_time) / eeg_input.shape[0])
             dnn_start_time = time.time()
 
             # first several steps for warm-up
@@ -94,13 +94,13 @@ def train(eeg_model, train_loader, test_loader, args):
                     param_group['lr'] = warm_lr
                 print('warm-up learning rate is {:f}'.format(optimizer.param_groups[0]['lr']))
 
-            audio_output = audio_model(audio_input)
+            eeg_output = eeg_model(eeg_input)
             if isinstance(loss_fn, torch.nn.CrossEntropyLoss):
-                loss = loss_fn(audio_output, torch.argmax(labels.long(), axis=1))
+                loss = loss_fn(eeg_output, torch.argmax(labels.long(), axis=1))
             else:
                 epsilon = 1e-7
-                audio_output = torch.clamp(audio_output, epsilon, 1. - epsilon)
-                loss = loss_fn(audio_output, labels)
+                eeg_output = torch.clamp(eeg_output, epsilon, 1. - epsilon)
+                loss = loss_fn(eeg_output, labels)
 
             # optimization if amp is not used
             optimizer.zero_grad()
@@ -110,8 +110,8 @@ def train(eeg_model, train_loader, test_loader, args):
             # record loss
             loss_meter.update(loss.item(), B)
             batch_time.update(time.time() - end_time)
-            per_sample_time.update((time.time() - end_time)/audio_input.shape[0])
-            per_sample_dnn_time.update((time.time() - dnn_start_time)/audio_input.shape[0])
+            per_sample_time.update((time.time() - end_time)/eeg_input.shape[0])
+            per_sample_dnn_time.update((time.time() - dnn_start_time)/eeg_input.shape[0])
 
             print_step = global_step % args.n_print_steps == 0
             early_print_step = epoch == 0 and global_step % (args.n_print_steps/10) == 0
@@ -150,16 +150,15 @@ def train(eeg_model, train_loader, test_loader, args):
         print("AUC: {:.6f}".format(mAUC))
         print("Avg Precision: {:.6f}".format(average_precision))
         print("Avg Recall: {:.6f}".format(average_recall))
-        print("d_prime: {:.6f}".format(d_prime(mAUC)))
         print("train_loss: {:.6f}".format(loss_meter.avg))
         print("valid_loss: {:.6f}".format(valid_loss))
 
         if main_metrics == 'mAP':
-            result[epoch - 1, :] = [mAP, mAUC, average_precision, average_recall, d_prime(mAUC), loss_meter.avg,
-                                    valid_loss, ensemble_mAP, ensemble_mAUC, optimizer.param_groups[0]['lr']]
+            result[epoch - 1, :] = [mAP, mAUC, average_precision, average_recall, loss_meter.avg,
+                                    valid_loss, optimizer.param_groups[0]['lr']]
         else:
-            result[epoch - 1, :] = [acc, mAUC, average_precision, average_recall, d_prime(mAUC), loss_meter.avg,
-                                    valid_loss, ensemble_acc, ensemble_mAUC, optimizer.param_groups[0]['lr']]
+            result[epoch - 1, :] = [acc, mAUC, average_precision, average_recall, loss_meter.avg,
+                                    valid_loss, optimizer.param_groups[0]['lr']]
         np.savetxt(exp_dir + '/result.csv', result, delimiter=',')
         print('validation finished')
 
@@ -201,8 +200,8 @@ def train(eeg_model, train_loader, test_loader, args):
     import matplotlib.pyplot as plt
 
     # Extracting loss and valid_loss data from result
-    loss_data = result[:, 5]  # Assuming loss is at index 5 in result
-    valid_loss_data = result[:, 6]  # Assuming valid_loss is at index 6 in result
+    loss_data = result[:, 4]  # Assuming loss is at index 5 in result
+    valid_loss_data = result[:, 5]  # Assuming valid_loss is at index 6 in result
 
     plt.figure()
     # Plotting loss and valid_loss vs epochs
@@ -212,6 +211,8 @@ def train(eeg_model, train_loader, test_loader, args):
     plt.ylabel('Loss')
     plt.title('Loss vs Epochs')
     plt.legend()
+    if os.path.exists(exp_dir + '/result_plots') == False:
+        os.mkdir(exp_dir + '/result_plots')
     plt.savefig(exp_dir + '/result_plots/loss.png')
 
     plt.figure()
@@ -230,7 +231,7 @@ def validate(eeg_model, val_loader, args, epoch, eval_target=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     batch_time = AverageMeter()
     if not isinstance(eeg_model, nn.DataParallel):
-        eeg_model = nn.DataParallel(audio_model)
+        eeg_model = nn.DataParallel(eeg_model)
     eeg_model = eeg_model.to(device)
     # switch to evaluate mode
     eeg_model.eval()
@@ -243,14 +244,14 @@ def validate(eeg_model, val_loader, args, epoch, eval_target=False):
         for i, (eeg_input, labels) in enumerate(val_loader):
             eeg_input = eeg_input.to(device)
             # compute output
-            eeg_output = audio_model(eeg_input)
+            eeg_output = eeg_model(eeg_input)
             predictions = eeg_output.to('cpu').detach()
             A_predictions.append(predictions)
             A_targets.append(labels)
             # compute the loss
             labels = labels.to(device)
             epsilon = 1e-7
-            eeg_output = torch.clamp(audio_output, epsilon, 1. - epsilon)
+            eeg_output = torch.clamp(eeg_output, epsilon, 1. - epsilon)
             if isinstance(args.loss_fn, torch.nn.CrossEntropyLoss):
                 loss = args.loss_fn(eeg_output, torch.argmax(labels.long(), axis=1))
             else:
@@ -262,17 +263,18 @@ def validate(eeg_model, val_loader, args, epoch, eval_target=False):
         eeg_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
         loss = np.mean(A_loss)
-        stats = calculate_stats(eeg_output, target)
+        stats = util.calculate_stats(eeg_output, target)
         # save the prediction here
         exp_dir = args.exp_dir
         if os.path.exists(exp_dir + '/predictions') == False:
             os.mkdir(exp_dir + '/predictions')
             np.savetxt(exp_dir + '/predictions/target.csv', target, delimiter=',')
-        np.savetxt(exp_dir + '/predictions/predictions_' + str(epoch) + '.csv', audio_output, delimiter=',')
+        np.savetxt(exp_dir + '/predictions/predictions_' + str(epoch) + '.csv', eeg_output, delimiter=',')
         # save the target for the separate eval set if there's one.
         if eval_target == True and os.path.exists(exp_dir + '/predictions/eval_target.csv') == False:
             np.savetxt(exp_dir + '/predictions/eval_target.csv', target, delimiter=',')
     return stats, loss
+
 
 
 
