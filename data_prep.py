@@ -29,7 +29,7 @@ while i < marker_data.shape[0]:
         i += 1
         continue
 
-    duration = marker_data.iloc[i]['duration']
+    duration = marker_data.iloc[i]['duration'] #column B
     data[dict_idx] = {'eeg_dat':[],
                       'label': marker_data.iloc[i]['type']}
     if eeg_idx < eeg_data.shape[0]:
@@ -48,32 +48,33 @@ from sklearn.model_selection import train_test_split
 keys = list(data.keys())
 random.shuffle(keys)
 
-# Split ratios
-train_ratio = 0.9
-val_ratio = 0.05
-test_ratio = 0.05
+# # Split ratios
+# train_ratio = 0.9
+# val_ratio = 0.05
+# test_ratio = 0.05
+#
+# # Calculate split sizes
+# total_samples = len(keys)
+# train_size = int(total_samples * train_ratio)
+# val_size = int(total_samples * val_ratio)
+# test_size = total_samples - train_size - val_size
+#
+# # Assign 'train', 'val', 'test' labels
+#
+# # Save the dictionary to a JSON file
+# with open('./data/prep_data.json', 'w') as json_file:
+#     json.dump(data, json_file, indent=4)
+#
+# print("Data saved to prep_data.json")
+# for i, key in enumerate(keys):
+#     if i < train_size:
+#         data[key]['set'] = 'train'
+#     elif i < train_size + val_size:
+#         data[key]['set'] = 'val'
+#     else:
+#         data[key]['set'] = 'test'
 
-# Calculate split sizes
-total_samples = len(keys)
-train_size = int(total_samples * train_ratio)
-val_size = int(total_samples * val_ratio)
-test_size = total_samples - train_size - val_size
 
-# Assign 'train', 'val', 'test' labels
-for i, key in enumerate(keys):
-    if i < train_size:
-        data[key]['set'] = 'train'
-    elif i < train_size + val_size:
-        data[key]['set'] = 'val'
-    else:
-        data[key]['set'] = 'test'
-
-
-# Save the dictionary to a JSON file
-with open('./data/prep_data.json', 'w') as json_file:
-    json.dump(data, json_file, indent=4)
-
-print("Data saved to prep_data.json")
 
 ############ split train,data,test #########
 def del_pattern(data):

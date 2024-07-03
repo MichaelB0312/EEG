@@ -20,7 +20,7 @@ parser.add_argument("--exp-dir", type=str, default="", help="directory to dump e
 parser.add_argument('-b', '--batch-size', default=16, type=int, metavar='N', help='mini-batch size (default: 100)')
 parser.add_argument("--optim", type=str, default="adam", help="training optimizer", choices=["sgd", "adam"])
 parser.add_argument('--lr', '--learning-rate', default=0.0005, type=float, metavar='LR', help='initial learning rate')
-parser.add_argument("--n-epochs", type=int, default=2, help="number of maximum training epochs")
+parser.add_argument("--n-epochs", type=int, default=40, help="number of maximum training epochs")
 parser.add_argument("--n-print-steps", type=int, default=1000, help="number of steps to print statistics")
 # model args
 parser.add_argument("--model", type=str, default="efficientnet", help="eeg model architecture", choices=["efficientnet", "svm"])
