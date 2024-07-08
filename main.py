@@ -46,17 +46,25 @@ args = parser.parse_args()
 #               'timem': args.timem, 'mixup': args.mixup, 'dataset': args.dataset, 'mode': 'train',
 #               'mean': args.dataset_mean, 'std': args.dataset_std,
 #               'noise': False}
+
+## save experiment in a directory
+if not bool(args.exp_dir):
+    print("exp_dir not specified, automatically naming one...")
+    args.exp_dir = "exp/%s/EEGModel-%s_Optim-%s_LR-%s_Epochs-%s" % (
+        time.strftime("%Y%m%d-%H%M%S"), args.model, args.optim,
+        args.lr, args.n_epochs)
+
 ###################### DATA LOADING #######################################
 train_loader = torch.utils.data.DataLoader(
-        dataloader.EEGDataset(args.data_train),
+        dataloader.EEGDataset(dataset_json_file=args.data_train, exp_dir=args.exp_dir),
         batch_size=args.batch_size, shuffle=True, num_workers=0, pin_memory=False)
 
 val_loader = torch.utils.data.DataLoader(
-    dataloader.EEGDataset(args.data_val),
+    dataloader.EEGDataset(dataset_json_file=args.data_val, exp_dir=args.exp_dir),
     batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
 eval_loader = torch.utils.data.DataLoader(
-        dataloader.EEGDataset(args.data_eval),
+        dataloader.EEGDataset(dataset_json_file=args.data_eval, exp_dir=args.exp_dir),
         batch_size=args.batch_size*2, shuffle=False, num_workers=0, pin_memory=True)
 
 ############################ MODEL IMPORTING ####################################
@@ -65,13 +73,6 @@ if args.model == 'efficientnet':
 elif args.model == 'svm':
     eeg_model = models.EEG_SVM_Classifier(kernel=args.kernel, C=args.c, gamma='scale')
 
-
-## save experiment in a directory
-if not bool(args.exp_dir):
-    print("exp_dir not specified, automatically naming one...")
-    args.exp_dir = "exp/%s/EEGModel-%s_Optim-%s_LR-%s_Epochs-%s" % (
-        time.strftime("%Y%m%d-%H%M%S"), args.model, args.optim,
-        args.lr, args.n_epochs)
 
 print("\nCreating experiment directory: %s" % args.exp_dir)
 if os.path.exists("%s/models" % args.exp_dir) == False:

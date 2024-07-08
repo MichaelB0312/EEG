@@ -78,7 +78,7 @@ random.shuffle(keys)
 
 ############ split train,data,test #########
 def del_pattern(data):
-    new_dict = data
+    new_dict = {}
     for dict_idx, value in data.items():
         if value['label'] != 'pattern':
             new_dict[dict_idx] = value
@@ -87,7 +87,7 @@ def del_pattern(data):
 
 ignore_pattern = True
 if ignore_pattern:
-    del_pattern(data)
+    data = del_pattern(data)
 
 # Convert dictionary to list of items
 data_list = [(key, value) for key, value in data.items()]
