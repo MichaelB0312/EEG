@@ -23,7 +23,7 @@ parser.add_argument('--lr', '--learning-rate', default=0.0005, type=float, metav
 parser.add_argument("--n-epochs", type=int, default=40, help="number of maximum training epochs")
 parser.add_argument("--n-print-steps", type=int, default=1000, help="number of steps to print statistics")
 # model args
-parser.add_argument("--model", type=str, default="efficientnet", help="eeg model architecture", choices=["efficientnet", "svm"])
+parser.add_argument("--model", type=str, default="svm", help="eeg model architecture", choices=["efficientnet", "svm"])
 parser.add_argument("--eff_b", type=int, default=0, help="which efficientnet to use, the larger number, the more complex")
 parser.add_argument("--n_class", type=int, default=2, help="number of classes")
 parser.add_argument('--impretrain', help='if use imagenet pretrained CNNs', type=ast.literal_eval, default='True')
@@ -55,23 +55,34 @@ if not bool(args.exp_dir):
         args.lr, args.n_epochs)
 
 ###################### DATA LOADING #######################################
+shuffle = True
+if args.model == 'svm':
+    args.batch_size = 1
+    shuffle = False
+
 train_loader = torch.utils.data.DataLoader(
         dataloader.EEGDataset(dataset_json_file=args.data_train, exp_dir=args.exp_dir),
-        batch_size=args.batch_size, shuffle=True, num_workers=0, pin_memory=False)
+        batch_size=args.batch_size, shuffle=shuffle, num_workers=0, pin_memory=False)
 
 val_loader = torch.utils.data.DataLoader(
     dataloader.EEGDataset(dataset_json_file=args.data_val, exp_dir=args.exp_dir),
     batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
-eval_loader = torch.utils.data.DataLoader(
+if args.model != 'svm':
+    eval_loader = torch.utils.data.DataLoader(
+            dataloader.EEGDataset(dataset_json_file=args.data_eval, exp_dir=args.exp_dir),
+            batch_size=args.batch_size*2, shuffle=False, num_workers=0, pin_memory=True)
+else:
+    eval_loader = torch.utils.data.DataLoader(
         dataloader.EEGDataset(dataset_json_file=args.data_eval, exp_dir=args.exp_dir),
-        batch_size=args.batch_size*2, shuffle=False, num_workers=0, pin_memory=True)
+        batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=True)
+
 
 ############################ MODEL IMPORTING ####################################
 if args.model == 'efficientnet':
     eeg_model = models.EffNetAttention(label_dim=args.n_class, b=args.eff_b, pretrain=args.impretrain, head_num=args.att_head)
 elif args.model == 'svm':
-    eeg_model = models.EEG_SVM_Classifier(kernel=args.kernel, C=args.c, gamma='scale')
+    eeg_model = models.EEG_SVM_Classifier(kernel=args.kernel, C=args.c)
 
 
 print("\nCreating experiment directory: %s" % args.exp_dir)
@@ -84,9 +95,9 @@ with open("%s/args.pkl" % args.exp_dir, "wb") as f:
 if args.model == 'efficientnet':
     train(eeg_model, train_loader, val_loader, args)
 elif args.model == 'svm':
-    eeg_model.fit(args.data_train)
-    val_accuracy = eeg_model.evaluate(args.data_val)
-    test_accuracy = eeg_model.evaluate(args.data_eval)
+    eeg_model.fit(train_loader)
+    val_accuracy = eeg_model.evaluate(val_loader)
+    test_accuracy = eeg_model.evaluate(eval_loader)
 
 print('---------------Result Summary---------------')
 if args.model == 'efficientnet':
