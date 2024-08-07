@@ -23,7 +23,7 @@ parser.add_argument('--lr', '--learning-rate', default=0.0005, type=float, metav
 parser.add_argument("--n-epochs", type=int, default=40, help="number of maximum training epochs")
 parser.add_argument("--n-print-steps", type=int, default=1000, help="number of steps to print statistics")
 # model args
-parser.add_argument("--model", type=str, default="svm", help="eeg model architecture", choices=["efficientnet", "svm"])
+parser.add_argument("--model", type=str, default="efficientnet", help="eeg model architecture", choices=["efficientnet", "svm"])
 parser.add_argument("--eff_b", type=int, default=0, help="which efficientnet to use, the larger number, the more complex")
 parser.add_argument("--n_class", type=int, default=2, help="number of classes")
 parser.add_argument('--impretrain', help='if use imagenet pretrained CNNs', type=ast.literal_eval, default='True')
