@@ -32,7 +32,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 samp_args = parser.parse_args()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 label_dict = {0: 'gap_element', 1: 'plain_hit'}
-
+##
 if samp_args.own_sample == False: #take a sample from test set
     with open('data/test.json', 'r') as fp:
         data_json = json.load(fp)
